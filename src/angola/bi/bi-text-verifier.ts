@@ -153,6 +153,21 @@ export function finalizeText(data: BIData, a: FinalizeArgs): { confidence: numbe
 
   const today = a.now.toISOString().slice(0, 10);
   const nasc = data.dataNascimento.value, emi = data.emitidoEm.value, val = data.validoAte.value;
+  // Compare calendar anniversaries in UTC so month lengths and leap years are respected.
+  const addMonths = (iso: string, months: number): string => {
+    const [year, month, day] = iso.split('-').map(Number);
+    const targetMonth = month - 1 + months;
+    const targetYear = year + Math.floor(targetMonth / 12);
+    const normalizedMonth = ((targetMonth % 12) + 12) % 12;
+    const lastDay = new Date(Date.UTC(targetYear, normalizedMonth + 1, 0)).getUTCDate();
+    return new Date(Date.UTC(targetYear, normalizedMonth, Math.min(day, lastDay))).toISOString().slice(0, 10);
+  };
+  const expiryAge = val && val < today
+    ? (today > addMonths(val, 12) ? 'over_year' : today > addMonths(val, 6) ? 'over_six_months' : 'under_six_months')
+    : null;
+  const expiryReason = expiryAge === 'over_year'
+    ? 'Bilhete de Identidade caducado há mais de 1 ano.'
+    : expiryAge === 'over_six_months' ? 'Bilhete de Identidade caducado há mais de 6 meses.' : null;
   if (nasc && nasc > today) add('dataNascimento', 'future', 'data de nascimento no futuro', 'error');
   if (emi && emi > today) add('emitidoEm', 'future', 'data de emissão no futuro', 'error');
   if (nasc && a.now.getUTCFullYear() - Number(nasc.slice(0, 4)) > 120) add('dataNascimento', 'age', 'idade superior a 120 anos', 'warning');
@@ -169,8 +184,11 @@ export function finalizeText(data: BIData, a: FinalizeArgs): { confidence: numbe
   const confidence = Number(((0.6 * minCrit + 0.4 * mean(all)) * (a.factor ?? 1)).toFixed(4));
 
   const reasons: string[] = [];
-  if (confidence < a.rejectBelow)
-    return { confidence, status: 'rejected', reasons: [`confiança agregada (${confidence.toFixed(2)}) abaixo de ${a.rejectBelow}`], issues };
+  if (confidence < a.rejectBelow) {
+    if (expiryReason) reasons.push(expiryReason);
+    reasons.push(`confiança agregada (${confidence.toFixed(2)}) abaixo de ${a.rejectBelow}`);
+    return { confidence, status: 'rejected', reasons: [...new Set(reasons)], issues };
+  }
 
   for (const k of a.critical) {
     const f = data[k] as Field<unknown>;
@@ -180,8 +198,11 @@ export function finalizeText(data: BIData, a: FinalizeArgs): { confidence: numbe
   }
   for (const i of issues) if (i.severity === 'error' && i.code !== 'missing' && i.code !== 'invalid') reasons.push(`${i.field}: ${i.message}`);
   if (confidence < a.minConfidence) reasons.push(`confiança agregada (${confidence.toFixed(2)}) abaixo de ${a.minConfidence}`);
+  if (expiryReason) reasons.push(expiryReason);
 
-  return { confidence, status: reasons.length ? 'needs_review' : 'approved', reasons: [...new Set(reasons)], issues };
+  const status: Status = expiryAge === 'over_year' ? 'rejected'
+    : (reasons.length || expiryAge === 'over_six_months') ? 'needs_review' : 'approved';
+  return { confidence, status, reasons: [...new Set(reasons)], issues };
 }
 
 export { ALL_FIELDS };
