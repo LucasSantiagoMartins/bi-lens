@@ -215,9 +215,9 @@ tests/             testes Vitest
 
 Contribuições devem manter a separação entre utilitários genéricos em `src/core/` e regras específicas de documentos em `src/angola/bi/`. Inclua testes para alterações de comportamento, actualize os exemplos/documentação quando a API pública mudar e não adicione imagens de identidade reais ao repositório.
 
-## Licença
+## License
 
-MIT, conforme declarado nos metadados do pacote.
+This project is distributed under the MIT License. See [LICENSE](LICENSE).
 
 ## Roadmap
 
