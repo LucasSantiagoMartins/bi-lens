@@ -19,7 +19,7 @@ Pode ser integrada em serviços de onboarding, fluxos internos de validação ou
 - Classificação estrutural do BI angolano recente e deteção dos lados através dos marcadores impressos.
 - Extração de número, nome, filiação, datas, sexo, estado civil, naturalidade, província, residência e altura.
 - Validação sintáctica e cruzada dos campos, votação entre leituras, confiança por campo e global.
-- Verificação de validade: a data esperada para o cartão recente é emissão + 10 anos − 1 dia; até 6 meses decorridos desde `validoAte`, a caducidade não altera por si só o estado; acima de 6 meses e até 1 ano encaminha para `needs_review`; acima de 1 ano resulta em `rejected`.
+- Verificação de validade conforme a idade na emissão: 5 anos para idades até 20, 10 anos dos 21 aos 55 e vitalícia a partir dos 56. Para prazos definidos, a data esperada é emissão + prazo − 1 dia. Até 6 meses decorridos desde `validoAte`, a caducidade não altera por si só o estado; acima de 6 meses e até 1 ano encaminha para `needs_review`; acima de 1 ano resulta em `rejected`.
 - Resultado de classificação (`isBI`), lados, estado (`approved`, `needs_review`, `rejected`), valores, motivos, issues e metadados. A confiança é heurística, não uma probabilidade calibrada.
 - Diagnóstico opcional com texto OCR e valores extraídos sem formatação. Pode conter dados pessoais.
 - API de texto em `bi-lens/text` para consumidores que já executaram OCR.

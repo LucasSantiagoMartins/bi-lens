@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Corrected BI validity-span checks to use the holder's age on the issue date (5-year, 10-year, or lifetime validity) instead of assuming every recent card lasts 10 years.
 - Added provider-agnostic document sources, built-in HTTP(S) URL loading, and `analyzeFrom` / `analyzeBIFrom` APIs for one or both BI sides.
 - Added npm package repository, support, Node.js engine, included license/changelog, and prepublish build metadata; documented external-source usage.
 - Reorganized the README and public API comments to describe the current package, its limits and development workflow.

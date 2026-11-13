@@ -3,8 +3,8 @@ import type { BIFieldKey } from './types';
 
 /** 9 dígitos + 2 letras + 3 dígitos (ex.: 000111222LA033). */
 export const BI_NUMBER_RE = /^\d{9}[A-Z]{2}\d{3}$/;
-/** O BI novo é válido 10 anos: emissão + 10 anos − 1 dia. */
-export const VALIDITY_YEARS = 10;
+/** Prazos definidos para menores e adultos; titulares na faixa vitalícia não têm prazo numérico esperado. */
+export const VALIDITY_YEARS = { minor: 5, adult: 10 } as const;
 /** ISO/IEC 7810 ID-1 (85,60 × 53,98 mm). */
 export const CARD_RATIO = 85.6 / 54;
 

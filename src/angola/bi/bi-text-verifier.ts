@@ -83,9 +83,22 @@ export function mergePasses(passes: BIData[]): BIData {
   return out as unknown as BIData;
 }
 
-/* ---------- Regra de validade (emissão + 10 anos − 1 dia) ---------- */
+/* ---------- Regra de validade por idade na data de emissão ---------- */
 
-export function expectedValidity(emitidoIso: string, years = VALIDITY_YEARS): string {
+function validityYearsAtEmission(nascimentoIso: string, emitidoIso: string): number | null {
+  const [birthYear, birthMonth, birthDay] = nascimentoIso.split('-').map(Number);
+  const [issueYear, issueMonth, issueDay] = emitidoIso.split('-').map(Number);
+  let age = issueYear - birthYear;
+  if (issueMonth < birthMonth || (issueMonth === birthMonth && issueDay < birthDay)) age--;
+  if (age <= 20) return VALIDITY_YEARS.minor;
+  if (age <= 55) return VALIDITY_YEARS.adult;
+  return null; // validade vitalícia
+}
+
+/** Expected printed expiry; null means the age at issue qualifies for lifetime validity. */
+export function expectedValidity(emitidoIso: string, nascimentoIso: string): string | null {
+  const years = validityYearsAtEmission(nascimentoIso, emitidoIso);
+  if (years === null) return null;
   const [y, m, d] = emitidoIso.split('-').map(Number);
   const dt = new Date(Date.UTC(y + years, m - 1, d));
   dt.setUTCDate(dt.getUTCDate() - 1);
@@ -105,19 +118,29 @@ export function resolveValidity(merged: BIData, passes: BIData[]) {
     passes.map((p) => p[k]).filter((f) => f.valid && f.value);
   const E = pool('emitidoEm'), V = pool('validoAte');
   const cur = { e: merged.emitidoEm.value, v: merged.validoAte.value };
-  const note = 'confirmado pela regra de validade (emissão + 10 anos − 1 dia)';
+  const nascimento = merged.dataNascimento.value;
+  if (!nascimento) return;
+  const noteFor = (emitido: string) => {
+    const years = validityYearsAtEmission(nascimento, emitido);
+    return years === null ? null : `confirmado pela regra de validade (${years} anos − 1 dia)`;
+  };
 
-  if (cur.e && cur.v && expectedValidity(cur.e) === cur.v) {
+  if (cur.e && cur.v && expectedValidity(cur.e, nascimento) === cur.v) {
+    const note = noteFor(cur.e) ?? 'confirmado pela validade vitalícia';
     const corroborated = merged.emitidoEm.votes >= 2 || merged.validoAte.votes >= 2;
     for (const f of [merged.emitidoEm, merged.validoAte]) { f.confidence = Math.max(f.confidence, ruled(f, corroborated)); f.note = note; }
     return;
   }
   const pairs: [Field<string>, Field<string>][] = [];
-  for (const e of E) for (const v of V) if (expectedValidity(e.value!) === v.value) pairs.push([e, v]);
+  for (const e of E) for (const v of V) {
+    const expected = e.value ? expectedValidity(e.value, nascimento) : null;
+    if (expected !== null && expected === v.value) pairs.push([e, v]);
+  }
   if (!pairs.length) return;
   const score = ([e, v]: [Field<string>, Field<string>]) =>
     (e.value === cur.e ? 1 : 0) + (v.value === cur.v ? 1 : 0) + e.confidence + v.confidence;
   const [e, v] = pairs.sort((a, b) => score(b) - score(a))[0];
+  const note = e.value ? noteFor(e.value) ?? 'confirmado pela regra de validade' : 'confirmado pela regra de validade';
   const corroborated = [e, v].some((f) => passes.filter((p) => p[f === e ? 'emitidoEm' : 'validoAte'].value === f.value).length >= 2);
   merged.emitidoEm = { ...e, confidence: ruled(e, corroborated), votes: Math.max(e.votes, 1), note: `resolvido: ${note}` };
   merged.validoAte = { ...v, confidence: ruled(v, corroborated), votes: Math.max(v.votes, 1), note: `resolvido: ${note}` };
@@ -173,8 +196,10 @@ export function finalizeText(data: BIData, a: FinalizeArgs): { confidence: numbe
   if (nasc && a.now.getUTCFullYear() - Number(nasc.slice(0, 4)) > 120) add('dataNascimento', 'age', 'idade superior a 120 anos', 'warning');
   if (nasc && emi && nasc >= emi) add('emitidoEm', 'date_order', 'emissão anterior ou igual ao nascimento', 'error');
   if (emi && val && emi >= val) add('validoAte', 'date_order', 'validade anterior ou igual à emissão', 'error');
-  if (emi && val && emi < val && expectedValidity(emi) !== val) {
-    add('validoAte', 'validity_span', `validade esperada ${expectedValidity(emi)} (emissão + 10 anos − 1 dia), lido ${val}`, 'warning');
+  const expectedExpiry = emi && nasc ? expectedValidity(emi, nasc) : null;
+  if (emi && nasc && val && emi < val && expectedExpiry !== null && expectedExpiry !== val) {
+    const years = validityYearsAtEmission(nasc, emi);
+    add('validoAte', 'validity_span', `validade esperada ${expectedExpiry} (prazo de ${years} anos conforme a idade na emissão), lido ${val}`, 'warning');
     for (const f of [data.emitidoEm, data.validoAte]) f.confidence *= 0.8; // um dos dois está provavelmente mal lido
   }
   if (val && val < today) add('validoAte', 'expired', 'documento expirado', 'warning');
