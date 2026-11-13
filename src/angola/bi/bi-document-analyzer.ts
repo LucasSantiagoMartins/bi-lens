@@ -1,4 +1,5 @@
 import { cropImageRegion, detectHorizontalDocumentRegions, loadImage, preprocess, type ImageInput, type ImageRegion } from '../../core/image-processing/preprocess';
+import type { DocumentReferences, DocumentSource } from '../../core/image-processing/document-source';
 import { createTesseractEngine } from '../../core/ocr/tesseract-engine';
 import { buildOcrLines, type OcrEngine, type OcrWord } from '../../core/ocr/types';
 import { ALL_FIELDS, BACK_FIELDS, FRONT_FIELDS } from './bi-layout';
@@ -215,6 +216,8 @@ export interface BILens {
   /** Analisa uma imagem ou imagens indicadas explicitamente como frente e verso.
    * @throws Erros de descodificação, pré-processamento ou inicialização/leitura OCR. */
   analyze(image: BIInput, options?: { debug?: boolean }): Promise<BIAnalysis>;
+  /** Resolve uma ou duas referências pela fonte indicada e analisa as imagens resultantes. */
+  analyzeFrom(source: DocumentSource, references: DocumentReferences, options?: { debug?: boolean }): Promise<BIAnalysis>;
   /** Liberta o worker OCR interno; um motor fornecido pelo consumidor não é terminado. */
   close(): Promise<void>;
 }
@@ -273,6 +276,24 @@ export function createBILens(options: LensOptions = {}): BILens {
       }
       return analyzeOcrPasses(results, { ...options, debug }, geometry, Date.now() - t0);
     },
+    async analyzeFrom(source, references, analyzeOptions = {}) {
+      if (typeof source?.load !== 'function') throw new TypeError('A fonte deve implementar load(reference).');
+      if (typeof references === 'string') return this.analyze(await source.load(references), analyzeOptions);
+      const resolved: Partial<Record<'front' | 'back', ImageInput>> = {};
+      for (const side of ['front', 'back'] as const) {
+        const reference = references[side];
+        if (reference !== undefined) resolved[side] = await source.load(reference);
+      }
+      if (resolved.front === undefined && resolved.back === undefined) {
+        throw new TypeError('As referências devem conter front ou back.');
+      }
+      if (resolved.front !== undefined && resolved.back !== undefined) {
+        return this.analyze({ front: resolved.front, back: resolved.back }, analyzeOptions);
+      }
+      if (resolved.front !== undefined) return this.analyze({ front: resolved.front }, analyzeOptions);
+      if (resolved.back !== undefined) return this.analyze({ back: resolved.back }, analyzeOptions);
+      throw new TypeError('As referências devem conter front ou back.');
+    },
     async close() {
       if (engine && !options.engine) await engine.terminate();
       engine = options.engine ?? null;
@@ -284,6 +305,16 @@ export function createBILens(options: LensOptions = {}): BILens {
 export async function analyzeBI(image: BIInput, options: LensOptions = {}): Promise<BIAnalysis> {
   const lens = createBILens(options);
   try { return await lens.analyze(image); } finally { await lens.close(); }
+}
+
+/** Resolve referências externas e analisa-as com um worker OCR de utilização única. */
+export async function analyzeBIFrom(
+  source: DocumentSource,
+  references: DocumentReferences,
+  options: LensOptions = {},
+): Promise<BIAnalysis> {
+  const lens = createBILens(options);
+  try { return await lens.analyzeFrom(source, references); } finally { await lens.close(); }
 }
 
 /** Texto OCR de um documento ou dos lados reconhecidos separadamente. */

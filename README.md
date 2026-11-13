@@ -13,7 +13,7 @@ Pode ser integrada em serviços de onboarding, fluxos internos de validação ou
 
 ## Funcionalidades
 
-- Entrada por caminho de ficheiro, `Buffer` ou `Uint8Array`; aceita imagem com os dois lados ou imagens indicadas separadamente.
+- Entrada por caminho de ficheiro, `Buffer` ou `Uint8Array`; aceita imagem com os dois lados ou imagens indicadas separadamente. Referências externas podem ser resolvidas por URL ou por um adapter de armazenamento fornecido pela aplicação.
 - Orientação EXIF, medição de nitidez e procura heurística de bandas de documento em fotografias verticais.
 - OCR em português com Tesseract.js, três passagens por omissão e suporte para um motor OCR fornecido pelo consumidor.
 - Classificação estrutural do BI angolano recente e deteção dos lados através dos marcadores impressos.
@@ -41,6 +41,8 @@ npm run build
 ```
 
 Após publicação, a instalação será `npm install bi-lens`.
+
+O pacote é preparado para publicação pública no npm com `npm publish`; o hook `prepublishOnly` compila os bundles e declarações antes da publicação. A publicação exige autenticação npm e deve ser feita pelo responsável pelo pacote.
 
 ## Utilização
 
@@ -72,6 +74,47 @@ const verso = await lens.analyze({ back: "./verso.jpg" });
 ```
 
 As indicações de lado são verificadas pelos marcadores detectados; lados trocados são reordenados e sinalizados. Uma imagem combinada pode conter ambos os lados. Em fotografias verticais, são procuradas bandas horizontais densas e pode ser feito OCR por recorte. Não há correcção de perspectiva nem garantia para rotações arbitrárias.
+
+### Fontes externas e buckets
+
+Para URLs públicas ou assinadas temporariamente, use `urlDocumentSource`. Para referências guardadas num bucket R2, S3, Azure ou noutro serviço, implemente `DocumentSource` na aplicação e passe a fonte e as referências ao método `analyzeFrom`. A biblioteca não conhece credenciais, SDKs ou conceitos de um fornecedor específico: o método `load` da aplicação transforma cada referência em bytes da imagem.
+
+```ts
+import { createBILens, urlDocumentSource } from 'bi-lens';
+
+const lens = createBILens();
+try {
+  const result = await lens.analyzeFrom(urlDocumentSource, {
+    front: 'https://ficheiros.exemplo/bi-frente?assinatura=...',
+    back: 'https://ficheiros.exemplo/bi-verso?assinatura=...',
+  });
+  console.log(result.status, result.values);
+} finally {
+  await lens.close();
+}
+```
+
+Adapter para referências próprias da aplicação (por exemplo, chaves de objectos R2):
+
+```ts
+import { createBILens, createDocumentSource } from 'bi-lens';
+
+const r2Source = createDocumentSource(async (objectKey) => {
+  const response = await obterObjectoDoR2(objectKey);
+  return new Uint8Array(await response.arrayBuffer());
+});
+const lens = createBILens();
+try {
+  const result = await lens.analyzeFrom(r2Source, {
+    front: 'pedidos/123/frente',
+    back: 'pedidos/123/verso',
+  });
+} finally {
+  await lens.close();
+}
+```
+
+`analyzeFrom` aceita uma referência única ou `{ front, back }`, carrega os bytes com a fonte indicada e executa a mesma análise de imagem. Para chamadas isoladas, `analyzeBIFrom(source, references, options)` cria e fecha o worker automaticamente. Erros da fonte e erros de descodificação/OCR são lançados ao consumidor. A fonte HTTP aceita apenas URLs `http:` e `https:` e verifica o estado HTTP; a validação do conteúdo da imagem é feita pelo descodificador da biblioteca.
 
 ### Entrada e resultado
 
@@ -233,4 +276,4 @@ Estudar sinais visuais e estruturais, como brasões, insígnias, layout, posiç�
 
 ### Multi-source Document Processing
 
-Separar a obtenção do ficheiro do seu processamento para permitir fontes como `Buffer`, `File`, `Stream`, URL ou referência de armazenamento. Uma futura abstracção `DocumentSource` e adapters poderiam integrar Cloudflare R2, AWS S3, Azure Blob Storage, Google Cloud Storage e fornecedores personalizados. Estas fontes e integrações ainda não estão implementadas.
+A resolução de URLs e referências de armazenamento já é suportada através de `DocumentSource`. Integrações específicas adicionais podem ser mantidas na aplicação consumidora ou publicadas como adapters independentes, sem acoplar o núcleo da biblioteca a SDKs de buckets.

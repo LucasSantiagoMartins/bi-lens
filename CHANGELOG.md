@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added provider-agnostic document sources, built-in HTTP(S) URL loading, and `analyzeFrom` / `analyzeBIFrom` APIs for one or both BI sides.
+- Added npm package repository, support, Node.js engine, included license/changelog, and prepublish build metadata; documented external-source usage.
 - Reorganized the README and public API comments to describe the current package, its limits and development workflow.
 - Moved the generic analysis CLI to `scripts/analyse.mjs` and made all input files explicit command-line arguments.
 - Removed bundled/local BI image samples and the regression helper that depended on that private sample set; retained the Portuguese OCR model.

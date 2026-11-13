@@ -3,6 +3,17 @@
   "version": "0.3.0",
   "description": "Analisa imagens do Bilhete de Identidade angolano: classifica, extrai, valida e pontua (com aprovação manual configurável).",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LucasSantiagoMartins/bi-lens.git"
+  },
+  "homepage": "https://github.com/LucasSantiagoMartins/bi-lens#readme",
+  "bugs": {
+    "url": "https://github.com/LucasSantiagoMartins/bi-lens/issues"
+  },
+  "engines": {
+    "node": ">=20.9.0"
+  },
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -19,13 +30,10 @@
       "require": "./dist/text.cjs"
     }
   },
-  "files": [
-    "dist",
-    "assets",
-    "README.md"
-  ],
+  "files": ["dist", "assets", "README.md", "LICENSE", "CHANGELOG.md"],
   "scripts": {
     "build": "tsup",
+    "prepublishOnly": "npm run build",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "analyse": "node scripts/analyse.mjs"
