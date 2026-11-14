@@ -1,6 +1,6 @@
 {
   "name": "bi-lens",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Analisa imagens do Bilhete de Identidade angolano: classifica, extrai, valida e pontua (com aprovação manual configurável).",
   "license": "MIT",
   "repository": {
@@ -30,7 +30,13 @@
       "require": "./dist/text.cjs"
     }
   },
-  "files": ["dist", "assets", "README.md", "LICENSE", "CHANGELOG.md"],
+  "files": [
+    "dist",
+    "assets",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
   "scripts": {
     "build": "tsup",
     "prepublishOnly": "npm run build",
