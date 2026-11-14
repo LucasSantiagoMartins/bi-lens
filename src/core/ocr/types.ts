@@ -1,11 +1,13 @@
+/*
+ * Responsabilidade: definir os contratos comuns de OCR.
+ * Conteúdo: palavras, linhas, resultados, motores e reconstrução de colunas.
+ * Pontos importantes: OcrEngine é o limite de extensão para motores externos.
+ */
 export interface OcrWord {
   text: string;
-  /** 0-100 (Tesseract). */
   confidence: number;
-  /** Posição no `text` do resultado. */
   start: number;
   end: number;
-  /** Caixa fornecida pelo Tesseract, em pixels da imagem reconhecida. */
   bbox?: { x0: number; y0: number; x1: number; y1: number };
 }
 
@@ -15,7 +17,6 @@ export interface OcrLine {
   columns: OcrWord[][];
 }
 
-/** Agrupa palavras pela sobreposição vertical e ordena linhas/colunas pela posição. */
 export function buildOcrLines(words: OcrWord[]): OcrLine[] {
   const positioned = words.filter((word) => word.bbox && word.bbox.x1 > word.bbox.x0 && word.bbox.y1 > word.bbox.y0)
     .slice().sort((a, b) => a.bbox!.y0 - b.bbox!.y0 || a.bbox!.x0 - b.bbox!.x0);
@@ -59,10 +60,7 @@ export interface OcrResult {
   words: OcrWord[];
   confidence: number;
 }
-/** Contrato para fornecer um motor OCR através das opções do analisador. */
 export interface OcrEngine {
-  /** Reconhece texto, confiança por palavra e coordenadas numa imagem preparada. */
   recognize(image: Buffer, opts?: { psm?: string }): Promise<OcrResult>;
-  /** Liberta os recursos mantidos pelo motor. */
   terminate(): Promise<void>;
 }

@@ -1,15 +1,16 @@
+/*
+ * Responsabilidade: carregar imagens através de referências externas.
+ * Conteúdo: contratos de fonte e adapters para URL ou armazenamento próprio.
+ * Pontos importantes: URLs aceitam apenas HTTP(S); descodificação cabe ao pipeline.
+ */
 import type { ImageInput } from './preprocess';
 
-/** Identifies one or both document sides in an external source. */
 export type DocumentReferences = string | { front: string; back?: string } | { back: string; front?: string };
 
-/** Loads an image reference from any storage or external service. */
 export interface DocumentSource {
-  /** Resolve a reference to encoded image bytes; image decoding remains BI Lens' responsibility. */
   load(reference: string): Promise<ImageInput>;
 }
 
-/** Generic HTTP(S) source for public or signed image URLs. */
 export const urlDocumentSource: DocumentSource = {
   async load(reference) {
     let url: URL;
@@ -23,7 +24,6 @@ export const urlDocumentSource: DocumentSource = {
   },
 };
 
-/** Adapts a consumer-provided source (R2, S3, Azure, local service, etc.) to BI Lens. */
 export function createDocumentSource(load: DocumentSource['load']): DocumentSource {
   return { load };
 }

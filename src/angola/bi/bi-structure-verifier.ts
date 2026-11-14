@@ -1,9 +1,13 @@
+/*
+ * Responsabilidade: classificar a estrutura reconhecida no texto OCR.
+ * Conteúdo: correspondência de marcadores, lados presentes e sinais de BI.
+ * Pontos importantes: rejeita marcadores conhecidos de documentos de teste.
+ */
 import { fuzzyContains } from '../../core/classification/fuzzy';
 import { matchText } from '../../core/text/normalize';
 import { MARKERS } from './bi-layout';
 import type { Sides, StructureResult } from './types';
 
-/** Procura os marcadores impressos no BI e decide se o texto é de um BI e que lados contém. */
 export function verifyStructure(texts: string[], hasNumber: boolean): StructureResult {
   const hay = texts.map(matchText).join('\n');
   const hit = (list: string[]) => list.filter((m) => fuzzyContains(hay, m));

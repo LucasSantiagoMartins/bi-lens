@@ -1,3 +1,8 @@
+/*
+ * Responsabilidade: combinar leituras e aplicar regras de validação do BI.
+ * Conteúdo: confiança OCR, votação, validade por idade, checks e decisão final.
+ * Pontos importantes: mantém regras de negócio aqui, separadas da extração.
+ */
 import { levenshtein, matchText } from '../../core/text/normalize';
 import type { OcrWord } from '../../core/ocr/types';
 import { ALL_FIELDS, VALIDITY_YEARS } from './bi-layout';
@@ -8,17 +13,14 @@ const capped = (f: Field<unknown>) => (f.corrected ? Math.min(f.baseConfidence, 
 const keys = (d: BIData) => Object.keys(d) as BIFieldKey[];
 const mean = (a: number[]) => a.reduce((x, y) => x + y, 0) / a.length;
 
-/* ---------- Confiança do OCR ---------- */
-
 const STRICT = new Set<BIFieldKey>(['numero', 'dataNascimento', 'emitidoEm', 'validoAte', 'altura']);
 
-/** Confiança por palavra do Tesseract → confiança por campo (mín. em campos de dígitos, média nos de texto). */
 export function applyWordConfidence(data: BIData, spans: Spans, words: OcrWord[]) {
   for (const key of keys(data)) {
     const f = data[key] as Field<unknown>, sp = spans[key];
     if (f.raw === null || !sp) continue;
     let ws = words.filter((w) => w.start < sp.end && w.end > sp.start && w.text.trim());
-    if (STRICT.has(key)) ws = ws.filter((w) => /[0-9(\[|!\/]/.test(w.text)); // ignora lixo à volta da data
+    if (STRICT.has(key)) ws = ws.filter((w) => /[0-9(\[|!\/]/.test(w.text)); // Mantém caracteres úteis para datas e números.
     if (!ws.length) continue;
     const c = ws.map((w) => Math.max(0, Math.min(1, w.confidence / 100)));
     f.ocrConfidence = STRICT.has(key) ? Math.min(...c) : mean(c);
@@ -26,7 +28,6 @@ export function applyWordConfidence(data: BIData, spans: Spans, words: OcrWord[]
   }
 }
 
-/** Confiança global do OCR (quando não há palavras). */
 export function applyScalarConfidence(data: BIData, ocr: number) {
   const factor = Math.max(0, Math.min(1, ocr > 1 ? ocr / 100 : ocr));
   for (const key of keys(data)) {
@@ -37,9 +38,8 @@ export function applyScalarConfidence(data: BIData, ocr: number) {
   }
 }
 
-/* ---------- Votação entre passagens ---------- */
 
-const FUZZY = new Set<BIFieldKey>(['nome', 'filiacao', 'naturalDe', 'residencia']); // texto livre: tolera pequenas diferenças
+const FUZZY = new Set<BIFieldKey>(['nome', 'filiacao', 'naturalDe', 'residencia']); // Texto livre tolera pequenas diferenças entre passagens.
 const similarity = (a: string, b: string) => 1 - levenshtein(a, b) / Math.max(a.length, b.length, 1);
 const uncappedOf = (f: Field<unknown>) => f.baseConfidence * (f.ocrConfidence ?? 1);
 
@@ -69,7 +69,7 @@ export function mergePasses(passes: BIData[]): BIData {
     const chosen = best.members.reduce((a, b) => (b.confidence > a.confidence ? b : a));
     const merged: Field<unknown> = { ...chosen, votes: best.members.length };
     if (best.members.length >= 2) {
-      // Leituras independentes concordam: sobe a confiança (e levanta o limite das correcções).
+      // Concordância independente entre passagens reforça a confiança da leitura.
       merged.confidence = Math.min(0.99, Math.max(...best.members.map(uncappedOf)) + 0.05 * (best.members.length - 1));
       merged.note = `${best.members.length}/${passes.length} passagens concordam`;
       if (!best.exact) { merged.confidence *= 0.9; merged.note += ' (com pequenas diferenças)'; }
@@ -83,7 +83,6 @@ export function mergePasses(passes: BIData[]): BIData {
   return out as unknown as BIData;
 }
 
-/* ---------- Regra de validade por idade na data de emissão ---------- */
 
 function validityYearsAtEmission(nascimentoIso: string, emitidoIso: string): number | null {
   const [birthYear, birthMonth, birthDay] = nascimentoIso.split('-').map(Number);
@@ -92,10 +91,9 @@ function validityYearsAtEmission(nascimentoIso: string, emitidoIso: string): num
   if (issueMonth < birthMonth || (issueMonth === birthMonth && issueDay < birthDay)) age--;
   if (age <= 20) return VALIDITY_YEARS.minor;
   if (age <= 55) return VALIDITY_YEARS.adult;
-  return null; // validade vitalícia
+  return null;
 }
 
-/** Expected printed expiry; null means the age at issue qualifies for lifetime validity. */
 export function expectedValidity(emitidoIso: string, nascimentoIso: string): string | null {
   const years = validityYearsAtEmission(nascimentoIso, emitidoIso);
   if (years === null) return null;
@@ -105,14 +103,9 @@ export function expectedValidity(emitidoIso: string, nascimentoIso: string): str
   return dt.toISOString().slice(0, 10);
 }
 
-/** Confiança de um par que cumpre a regra: o OCR por palavra é pouco fiável em texto pequeno, por isso tem piso 0.9 se houver corroboração. */
 const ruled = (f: Field<unknown>, corroborated: boolean) =>
   Math.min(0.97, f.baseConfidence * (corroborated ? Math.max(f.ocrConfidence ?? 1, 0.9) : f.ocrConfidence ?? 1));
 
-/**
- * Se emissão e validade são incoerentes, tenta resolver com leituras alternativas das outras passagens.
- * Um par que cumpre exactamente a regra é muito improvável por coincidência, por isso ganha confiança.
- */
 export function resolveValidity(merged: BIData, passes: BIData[]) {
   const pool = (k: 'emitidoEm' | 'validoAte') =>
     passes.map((p) => p[k]).filter((f) => f.valid && f.value);
@@ -146,7 +139,6 @@ export function resolveValidity(merged: BIData, passes: BIData[]) {
   merged.validoAte = { ...v, confidence: ruled(v, corroborated), votes: Math.max(v.votes, 1), note: `resolvido: ${note}` };
 }
 
-/* ---------- Validação cruzada + decisão ---------- */
 
 export interface FinalizeArgs {
   minConfidence: number;
@@ -176,7 +168,7 @@ export function finalizeText(data: BIData, a: FinalizeArgs): { confidence: numbe
 
   const today = a.now.toISOString().slice(0, 10);
   const nasc = data.dataNascimento.value, emi = data.emitidoEm.value, val = data.validoAte.value;
-  // Compare calendar anniversaries in UTC so month lengths and leap years are respected.
+  // UTC respeita a duração de cada mês e os anos bissextos ao comparar aniversários.
   const addMonths = (iso: string, months: number): string => {
     const [year, month, day] = iso.split('-').map(Number);
     const targetMonth = month - 1 + months;
@@ -200,7 +192,7 @@ export function finalizeText(data: BIData, a: FinalizeArgs): { confidence: numbe
   if (emi && nasc && val && emi < val && expectedExpiry !== null && expectedExpiry !== val) {
     const years = validityYearsAtEmission(nasc, emi);
     add('validoAte', 'validity_span', `validade esperada ${expectedExpiry} (prazo de ${years} anos conforme a idade na emissão), lido ${val}`, 'warning');
-    for (const f of [data.emitidoEm, data.validoAte]) f.confidence *= 0.8; // um dos dois está provavelmente mal lido
+    for (const f of [data.emitidoEm, data.validoAte]) f.confidence *= 0.8; // Um dos dois valores foi provavelmente mal lido.
   }
   if (val && val < today) add('validoAte', 'expired', 'documento expirado', 'warning');
 

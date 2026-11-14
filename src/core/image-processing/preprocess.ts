@@ -1,3 +1,8 @@
+/*
+ * Responsabilidade: preparar imagens para análise e OCR.
+ * Conteúdo: orientação EXIF, métricas, detecção de lados empilhados e recortes.
+ * Pontos importantes: regras de classificação e campos ficam nos módulos do BI.
+ */
 export type ImageInput = Buffer | Uint8Array | string;
 
 async function loadSharp(): Promise<any> {
@@ -8,13 +13,11 @@ async function loadSharp(): Promise<any> {
 export interface ImageInfo {
   width: number;
   height: number;
-  /** Variância do laplaciano (heurística; mais alto = mais nítido). */
   sharpness: number;
 }
 
 export interface ImageRegion { left: number; top: number; width: number; height: number }
 
-/** Detecta faixas horizontais densas em imagens verticais, como lados de cartão fotografados separadamente. */
 export async function detectHorizontalDocumentRegions(buffer: Buffer, info: ImageInfo): Promise<ImageRegion[]> {
   if (info.height < info.width * 1.2) return [];
   const sharp = await loadSharp();
@@ -57,7 +60,6 @@ export async function detectHorizontalDocumentRegions(buffer: Buffer, info: Imag
     });
 }
 
-/** Aplica a orientação EXIF e mede a imagem. Devolve também o buffer já orientado. */
 export async function loadImage(input: ImageInput): Promise<{ buffer: Buffer; info: ImageInfo }> {
   const sharp = await loadSharp();
   const { data, info } = await sharp(input).rotate().toBuffer({ resolveWithObject: true });
@@ -70,7 +72,6 @@ export async function loadImage(input: ImageInput): Promise<{ buffer: Buffer; in
   return { buffer: data, info: { width: info.width, height: info.height, sharpness: Number((sd * sd).toFixed(1)) } };
 }
 
-/** Escala de cinza + contraste + nitidez, ampliando para `width` px (bom para OCR). */
 export async function preprocess(buffer: Buffer, opts: { width: number }): Promise<Buffer> {
   const sharp = await loadSharp();
   return sharp(buffer)

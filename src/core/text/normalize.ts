@@ -1,9 +1,13 @@
+/*
+ * Responsabilidade: fornecer utilitários de texto reutilizáveis.
+ * Conteúdo: normalização, correcção OCR, distância, listas fechadas e datas.
+ * Pontos importantes: não deve conter regras de campos ou documentos do BI.
+ */
 export const foldAccents = (s: string) =>
   s.split('').map((c) => c.normalize('NFD')[0]).join(''); // mantém o comprimento (índices alinhados)
 export const matchText = (s: string) => foldAccents(s).toUpperCase();
 export const collapse = (s: string) => s.replace(/\s+/g, ' ').trim();
 
-// Confusões típicas de OCR em contexto numérico.
 const DIGIT_FIX: Record<string, string> = {
   O: '0', Q: '0', I: '1', L: '1', S: '5', B: '8', Z: '2', '(': '1', '[': '1', '|': '1', '!': '1', F: '1',
 };
@@ -60,7 +64,6 @@ export function parseDate(raw: string): { iso: string; corrected: boolean } | nu
   return { iso: `${Yn}-${pad(Mn)}-${pad(Dn)}`, corrected };
 }
 
-/** Melhor correspondência numa lista fechada (tolera até ~1/3 de erros de OCR). */
 export function matchClosed<T extends string>(raw: string, table: Record<string, T>): { value: T; exact: boolean } | null {
   const q = matchText(raw).replace(/\(A\)/g, '').replace(/[^A-Z ]/g, ' ').replace(/\s+/g, ' ').trim();
   if (!q) return null;

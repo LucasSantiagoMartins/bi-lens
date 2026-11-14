@@ -1,6 +1,10 @@
+/*
+ * Responsabilidade: comparar aproximadamente trechos de texto normalizado.
+ * Conteúdo: utilitário fuzzy baseado em distância de edição.
+ * Pontos importantes: marcadores específicos do BI são definidos noutro módulo.
+ */
 import { levenshtein } from '../text/normalize';
 
-/** O `needle` aparece (aproximadamente) em `haystack`? Ambos já em maiúsculas sem acentos. */
 export function fuzzyContains(haystack: string, needle: string, maxRatio = 0.2): boolean {
   if (haystack.includes(needle)) return true;
   const max = Math.floor(needle.length * maxRatio);

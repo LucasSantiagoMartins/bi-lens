@@ -1,3 +1,10 @@
+/*
+ * Responsabilidade: coordenar a análise de imagem e de texto OCR.
+ * Conteúdo: configuração, processamento das imagens, passagens OCR, combinação
+ * dos resultados e gestão do ciclo de vida do motor reutilizável.
+ * Pontos importantes: a análise textual é partilhada pelos dois fluxos e o
+ * motor criado internamente só é libertado por close() ou pelas funções one-shot.
+ */
 import { cropImageRegion, detectHorizontalDocumentRegions, loadImage, preprocess, type ImageInput, type ImageRegion } from '../../core/image-processing/preprocess';
 import type { DocumentReferences, DocumentSource } from '../../core/image-processing/document-source';
 import { createTesseractEngine } from '../../core/ocr/tesseract-engine';
@@ -14,19 +21,14 @@ import type {
   BIAnalysis, BIData, BIFieldKey, BIInput, BIInputRole, GeometryResult, Sides, TextOptions,
 } from './types';
 
-/** Resultado OCR fornecido ao pipeline de análise textual. */
 export interface OcrPass { text: string; words?: OcrWord[]; regions?: ImageRegion[] }
-/** Largura da imagem e modo de segmentação do Tesseract numa passagem OCR. */
 export interface PassConfig { width: number; psm: string }
-/** Configuração do processamento de imagem, OCR e decisões por confiança. */
 export interface LensOptions extends TextOptions {
   langPath?: string;
   passes?: PassConfig[];
-  /** Motor de OCR próprio (por defeito: Tesseract.js local). */
   engine?: OcrEngine;
 }
 
-/** Escalas OCR padrão; tamanhos independentes podem expor erros de leitura diferentes. */
 export const DEFAULT_PASSES: PassConfig[] = [
   // escalas diferentes → erros diferentes → a votação consegue apanhá-los
   { width: 1552, psm: '3' },
@@ -127,7 +129,6 @@ function combineAnalyses(
   };
 }
 
-/** Combina passagens OCR e produz uma análise sem carregar imagem nem inicializar OCR. */
 export function analyzeOcrPasses(
   passes: OcrPass[],
   o: TextOptions = {},
@@ -213,17 +214,11 @@ export function analyzeOcrPasses(
 }
 
 export interface BILens {
-  /** Analisa uma imagem ou imagens indicadas explicitamente como frente e verso.
-   * @throws Erros de descodificação, pré-processamento ou inicialização/leitura OCR. */
   analyze(image: BIInput, options?: { debug?: boolean }): Promise<BIAnalysis>;
-  /** Resolve uma ou duas referências pela fonte indicada e analisa as imagens resultantes. */
   analyzeFrom(source: DocumentSource, references: DocumentReferences, options?: { debug?: boolean }): Promise<BIAnalysis>;
-  /** Liberta o worker OCR interno; um motor fornecido pelo consumidor não é terminado. */
   close(): Promise<void>;
 }
 
-/** Cria um analisador reutilizável. O worker OCR é inicializado na primeira imagem e
- * permanece activo até à chamada de {@link BILens.close}. */
 export function createBILens(options: LensOptions = {}): BILens {
   LensOptionsSchema.parse(options);
   const passes = options.passes ?? DEFAULT_PASSES;
@@ -301,13 +296,11 @@ export function createBILens(options: LensOptions = {}): BILens {
   };
 }
 
-/** Analisa uma entrada e fecha o worker OCR interno no fim da chamada. */
 export async function analyzeBI(image: BIInput, options: LensOptions = {}): Promise<BIAnalysis> {
   const lens = createBILens(options);
   try { return await lens.analyze(image); } finally { await lens.close(); }
 }
 
-/** Resolve referências externas e analisa-as com um worker OCR de utilização única. */
 export async function analyzeBIFrom(
   source: DocumentSource,
   references: DocumentReferences,
@@ -317,11 +310,8 @@ export async function analyzeBIFrom(
   try { return await lens.analyzeFrom(source, references); } finally { await lens.close(); }
 }
 
-/** Texto OCR de um documento ou dos lados reconhecidos separadamente. */
 export type BITextInput = string | { front: string; back?: string } | { back: string; front?: string };
 
-/** Analisa texto já reconhecido, sem carregar dependências de imagem ou OCR.
- * Aplica as regras de estrutura, extracção e validação específicas do BI. */
 export function parseBI(ocrText: BITextInput, options: TextOptions = {}): BIAnalysis {
   if (typeof ocrText !== 'string') {
     const entries = (['front', 'back'] as const).flatMap((role) => ocrText[role] === undefined ? [] :

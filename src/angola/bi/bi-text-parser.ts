@@ -1,3 +1,8 @@
+/*
+ * Responsabilidade: extrair campos tipados do BI a partir do OCR.
+ * Conteúdo: segmentação por rótulos, correcções contextuais e extração por caixas.
+ * Pontos importantes: preserva leitura bruta, validade e evidência de confiança.
+ */
 import { collapse, fixDigits, fixLetters, matchClosed, matchText, parseDate } from '../../core/text/normalize';
 import { buildOcrLines, type OcrWord } from '../../core/ocr/types';
 import { BI_NUMBER_RE, ESTADOS_CIVIS, LABELS, PROVINCIAS, SEXOS, type SegKey } from './bi-layout';
@@ -19,7 +24,6 @@ const found = <T>(value: T, raw: string, base: number, corrected = false, note?:
   mk<T>({ value, raw, valid: true, baseConfidence: base, corrected, note });
 const invalid = <T>(raw: string, base = 0.3) => mk<T>({ raw, valid: false, baseConfidence: base });
 
-/* ---------- Segmentação por rótulos (com posições) ---------- */
 export type Segments = Partial<Record<SegKey, { text: string; start: number; end: number }>>;
 
 export function segment(text: string): Segments {
@@ -48,7 +52,6 @@ export function segment(text: string): Segments {
   return out;
 }
 
-/* ---------- Número do BI ---------- */
 const NUM_RE = /([0-9OILSBZQ]{9})\s?([A-Z0-9]{2})\s?([0-9OILSBZQ]{3})/g;
 
 export function extractNumero(text: string): { field: Field<string>; start: number; end: number } | null {
@@ -68,10 +71,8 @@ export function extractNumero(text: string): { field: Field<string>; start: numb
   return null;
 }
 
-/* ---------- Campos ---------- */
 const LETTERS = /[^A-Za-zÀ-ÿ\s'\-]/g;
 
-/** O BI imprime nomes em MAIÚSCULAS: uma palavra em minúsculas no meio é quase sempre ruído do OCR. */
 function mixedCasePenalty(tokens: string[]): number {
   const t = tokens.filter((w) => w.length >= 2 && !/^e$/.test(w));
   const upper = t.filter((w) => w === w.toUpperCase()).length;
@@ -152,7 +153,6 @@ export function extractAltura(raw?: string): Field<number> {
   return found(value, raw, base, corrected, note);
 }
 
-/* ---------- Tudo junto ---------- */
 export function extractFields(text: string): { data: BIData; spans: Spans } {
   const spans: Spans = {};
   const num = extractNumero(text);
@@ -179,10 +179,6 @@ export function extractFields(text: string): { data: BIData; spans: Spans } {
   return { data, spans };
 }
 
-/**
- * Extracts values from geometrically ordered OCR lines. Values stop at the next
- * label on the same line; wrapped values are limited to the label's x column.
- */
 export function extractFieldsFromWords(text: string, words: OcrWord[]): { data: BIData; spans: Spans; confidenceWords: OcrWord[] } | null {
   const lines = buildOcrLines(words);
   if (!lines.length) return null;

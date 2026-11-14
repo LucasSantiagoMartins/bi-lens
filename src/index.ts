@@ -1,4 +1,8 @@
-/** Entrada pública da análise de imagem e das APIs reduzidas de análise textual. */
+/*
+ * Responsabilidade: ponto de entrada principal do pacote.
+ * Conteúdo: análise de imagem e texto, fontes externas, tipos e extensão OCR.
+ * Pontos importantes: mantém os exports públicos disponíveis pelo caminho ".".
+ */
 export * from './text';
 export { createBILens, analyzeBI, analyzeBIFrom, parseBI, DEFAULT_PASSES } from './angola/bi/bi-document-analyzer';
 export type { BILens, LensOptions, PassConfig, OcrPass } from './angola/bi/bi-document-analyzer';

@@ -1,16 +1,17 @@
+/*
+ * Responsabilidade: centralizar regras e vocabulário impressos no BI angolano.
+ * Conteúdo: formato do número, validade, proporção, rótulos e marcadores.
+ * Pontos importantes: estes marcadores alimentam extração e classificação.
+ */
 import { matchText } from '../../core/text/normalize';
 import type { BIFieldKey } from './types';
 
-/** 9 dígitos + 2 letras + 3 dígitos (ex.: 000111222LA033). */
 export const BI_NUMBER_RE = /^\d{9}[A-Z]{2}\d{3}$/;
-/** Prazos definidos para menores e adultos; titulares na faixa vitalícia não têm prazo numérico esperado. */
 export const VALIDITY_YEARS = { minor: 5, adult: 10 } as const;
-/** ISO/IEC 7810 ID-1 (85,60 × 53,98 mm). */
 export const CARD_RATIO = 85.6 / 54;
 
 export type SegKey = Exclude<BIFieldKey, 'numero'>;
 
-// Aplicados a texto sem acentos e em maiúsculas. 'stop' só delimita segmentos.
 export const LABELS: [SegKey | 'stop', RegExp][] = [
   ['nome', /\bNOME(?: COMPLETO)?\b/],
   ['filiacao', /\bFILIACAO(?:\s*:?\s*FILHO\(?A?\)?\s+DE)?|\bFILHO\(?A?\)?\s+DE\b/],
@@ -36,7 +37,6 @@ export const BACK_FIELDS: BIFieldKey[] = [
 ];
 export const ALL_FIELDS: BIFieldKey[] = [...FRONT_FIELDS, ...BACK_FIELDS];
 
-/** Marcadores impressos no cartão, para decidir se é (ou não) um BI e que lados aparecem. */
 export const MARKERS = {
   header: ['REPUBLICA DE ANGOLA', 'BILHETE DE IDENTIDADE', 'CIDADAO NACIONAL'],
   front: ['NOME COMPLETO', 'FILIACAO', 'ASSINATURA DO TITULAR'],

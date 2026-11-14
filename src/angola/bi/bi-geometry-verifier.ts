@@ -1,12 +1,16 @@
+/*
+ * Responsabilidade: avaliar geometria e qualidade básica da imagem.
+ * Conteúdo: proporção do cartão, resolução mínima e heurística de nitidez.
+ * Pontos importantes: produz avisos e ajusta confiança; não rejeita por si só.
+ */
 import type { ImageInfo } from '../../core/image-processing/preprocess';
 import { CARD_RATIO } from './bi-layout';
 import type { GeometryResult, Issue } from './types';
 
 const TOL = 0.15;
 const MIN_WIDTH = 500;
-const BLURRY_BELOW = 800; // heurística: afinar com amostras reais
+const BLURRY_BELOW = 800;
 
-/** Verificações baratas de geometria/qualidade (sem OpenCV). Não rejeita; só desconta confiança. */
 export function verifyGeometry(info: ImageInfo): GeometryResult {
   const ratio = info.width / info.height;
   const near = (target: number) => Math.abs(ratio - target) / target <= TOL;

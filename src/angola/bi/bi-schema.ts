@@ -1,3 +1,8 @@
+/*
+ * Responsabilidade: validar em runtime opções e resultados da análise.
+ * Conteúdo: schemas Zod para campos, issues, metadados e configuração.
+ * Pontos importantes: limites das opções devem coincidir com os tipos públicos.
+ */
 import { z } from 'zod';
 
 export const FieldSchema = z.object({
