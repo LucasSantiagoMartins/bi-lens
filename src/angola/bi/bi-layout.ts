@@ -1,7 +1,7 @@
 /*
- * Responsabilidade: centralizar regras e vocabulário impressos no BI angolano.
- * Conteúdo: formato do número, validade, proporção, rótulos e marcadores.
- * Pontos importantes: estes marcadores alimentam extração e classificação.
+ * Responsibility: centralize rules and vocabulary printed on Angolan BIs.
+ * Contents: number format, validity, aspect ratio, labels, and markers.
+ * Key points: these markers support extraction and classification.
  */
 import { matchText } from '../../core/text/normalize';
 import type { BIFieldKey } from './types';

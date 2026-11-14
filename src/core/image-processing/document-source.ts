@@ -1,7 +1,7 @@
 /*
- * Responsabilidade: carregar imagens através de referências externas.
- * Conteúdo: contratos de fonte e adapters para URL ou armazenamento próprio.
- * Pontos importantes: URLs aceitam apenas HTTP(S); descodificação cabe ao pipeline.
+ * Responsibility: load images through external references.
+ * Contents: source contracts and adapters for URLs or custom storage.
+ * Key points: URLs accept only HTTP(S); decoding is handled by the pipeline.
  */
 import type { ImageInput } from './preprocess';
 

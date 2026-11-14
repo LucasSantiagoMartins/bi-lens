@@ -1,7 +1,7 @@
 /*
- * Responsabilidade: definir os contratos comuns de OCR.
- * Conteúdo: palavras, linhas, resultados, motores e reconstrução de colunas.
- * Pontos importantes: OcrEngine é o limite de extensão para motores externos.
+ * Responsibility: define the shared OCR contracts.
+ * Contents: words, lines, results, engines, and column reconstruction.
+ * Key points: OcrEngine is the extension boundary for external engines.
  */
 export interface OcrWord {
   text: string;

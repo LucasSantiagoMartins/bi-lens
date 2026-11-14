@@ -1,20 +1,20 @@
 import { createBILens } from 'bi-lens';
 
 /**
- * Ferramenta local para executar a API pública de análise de imagem sobre
- * ficheiros indicados pelo programador. Gere primeiro o pacote com `npm run build`.
+ * Local tool for running the public image analysis API on files supplied by
+ * the developer. Build the package first with `npm run build`.
  *
- * Utilização:
+ * Usage:
  *   node scripts/analyse.mjs <imagem>
  *   node scripts/analyse.mjs --front <imagem> --back <imagem>
  *   node scripts/analyse.mjs <imagem> --debug
  *   node scripts/analyse.mjs --front <imagem> --back <imagem> --min-confidence 0.9
  *
- * `--debug` imprime o diagnóstico OCR devolvido pela biblioteca, que pode
- * conter dados pessoais. Use-o apenas com ficheiros que possa inspeccionar.
- * O resumo apresenta classificação, estado, confiança, valores e motivos.
- * Esta ferramenta apoia a análise manual; expectativas automatizadas pertencem
- * à suite de testes.
+ * `--debug` prints the OCR diagnostics returned by the library, which may
+ * contain personal data. Use it only with files you are allowed to inspect.
+ * The summary shows classification, status, confidence, values, and reasons.
+ * This tool supports manual analysis; automated expectations belong in the
+ * test suite.
  */
 function parseArguments(args) {
   const options = { debug: false, minConfidence: 0.85 };

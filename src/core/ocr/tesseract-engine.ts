@@ -1,8 +1,8 @@
 /*
- * Responsabilidade: adaptar Tesseract.js ao contrato OcrEngine.
- * Conteúdo: inicialização do worker e conversão do resultado para texto,
- * confiança por palavra e coordenadas usadas pelo pipeline.
- * Pontos importantes: usa o modelo português incluído por omissão.
+ * Responsibility: adapt Tesseract.js to the OcrEngine contract.
+ * Contents: worker initialization and conversion of results to text,
+ * per-word confidence, and coordinates used by the pipeline.
+ * Key points: uses the bundled Portuguese model by default.
  */
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';

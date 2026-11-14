@@ -1,8 +1,8 @@
 /*
- * Responsabilidade: definir os contratos partilhados da análise do BI.
- * Conteúdo: campos extraídos, confiança, issues, estrutura, opções e resultado.
- * Pontos importantes: datas são ISO; altura está em metros; nomes de campos
- * portugueses preservam o formato de dados do BI e a API pública existente.
+ * Responsibility: define the shared contracts for BI analysis.
+ * Contents: extracted fields, confidence, issues, structure, options, and results.
+ * Key points: dates use ISO format; height is in meters; Portuguese field names
+ * preserve the BI data format and the existing public API.
  */
 import type { OcrLine } from '../../core/ocr/types';
 import type { ImageInput } from '../../core/image-processing/preprocess';

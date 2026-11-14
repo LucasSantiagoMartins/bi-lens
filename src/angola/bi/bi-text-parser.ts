@@ -1,7 +1,7 @@
 /*
- * Responsabilidade: extrair campos tipados do BI a partir do OCR.
- * Conteúdo: segmentação por rótulos, correcções contextuais e extração por caixas.
- * Pontos importantes: preserva leitura bruta, validade e evidência de confiança.
+ * Responsibility: extract typed BI fields from OCR.
+ * Contents: label-based segmentation, contextual corrections, and box-based extraction.
+ * Key points: preserves raw readings, validity, and confidence evidence.
  */
 import { collapse, fixDigits, fixLetters, matchClosed, matchText, parseDate } from '../../core/text/normalize';
 import { buildOcrLines, type OcrWord } from '../../core/ocr/types';
@@ -95,7 +95,7 @@ export function extractFiliacao(raw?: string): Field<Filiacao> {
     const w = collapse((s ?? '').replace(LETTERS, ' ')).split(' ').filter((t) => t.length >= 2);
     return w.length ? w.join(' ') : null;
   };
-  // pai "e" mãe  |  pai "E DE" mãe
+  // father "and" mother | father "AND OF" mother
   const m = / E (?:DE )?/i.exec(' ' + raw + ' ');
   let pai: string | null, mae: string | null;
   if (m) {

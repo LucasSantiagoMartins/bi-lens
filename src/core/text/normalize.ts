@@ -1,10 +1,10 @@
 /*
- * Responsabilidade: fornecer utilitários de texto reutilizáveis.
- * Conteúdo: normalização, correcção OCR, distância, listas fechadas e datas.
- * Pontos importantes: não deve conter regras de campos ou documentos do BI.
+ * Responsibility: provide reusable text utilities.
+ * Contents: normalization, OCR correction, distance, closed lists, and dates.
+ * Key points: must not contain BI field or document rules.
  */
 export const foldAccents = (s: string) =>
-  s.split('').map((c) => c.normalize('NFD')[0]).join(''); // mantém o comprimento (índices alinhados)
+  s.split('').map((c) => c.normalize('NFD')[0]).join(''); // Preserves length so indices stay aligned.
 export const matchText = (s: string) => foldAccents(s).toUpperCase();
 export const collapse = (s: string) => s.replace(/\s+/g, ' ').trim();
 

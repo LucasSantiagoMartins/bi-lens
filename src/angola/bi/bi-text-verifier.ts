@@ -1,7 +1,7 @@
 /*
- * Responsabilidade: combinar leituras e aplicar regras de validação do BI.
- * Conteúdo: confiança OCR, votação, validade por idade, checks e decisão final.
- * Pontos importantes: mantém regras de negócio aqui, separadas da extração.
+ * Responsibility: combine readings and apply BI validation rules.
+ * Contents: OCR confidence, voting, age-based validity, checks, and final decision.
+ * Key points: keeps business rules here, separate from extraction.
  */
 import { levenshtein, matchText } from '../../core/text/normalize';
 import type { OcrWord } from '../../core/ocr/types';
@@ -20,7 +20,7 @@ export function applyWordConfidence(data: BIData, spans: Spans, words: OcrWord[]
     const f = data[key] as Field<unknown>, sp = spans[key];
     if (f.raw === null || !sp) continue;
     let ws = words.filter((w) => w.start < sp.end && w.end > sp.start && w.text.trim());
-    if (STRICT.has(key)) ws = ws.filter((w) => /[0-9(\[|!\/]/.test(w.text)); // Mantém caracteres úteis para datas e números.
+    if (STRICT.has(key)) ws = ws.filter((w) => /[0-9(\[|!\/]/.test(w.text)); // Keeps characters useful for dates and numbers.
     if (!ws.length) continue;
     const c = ws.map((w) => Math.max(0, Math.min(1, w.confidence / 100)));
     f.ocrConfidence = STRICT.has(key) ? Math.min(...c) : mean(c);
@@ -39,7 +39,7 @@ export function applyScalarConfidence(data: BIData, ocr: number) {
 }
 
 
-const FUZZY = new Set<BIFieldKey>(['nome', 'filiacao', 'naturalDe', 'residencia']); // Texto livre tolera pequenas diferenças entre passagens.
+const FUZZY = new Set<BIFieldKey>(['nome', 'filiacao', 'naturalDe', 'residencia']); // Free text tolerates small differences between passes.
 const similarity = (a: string, b: string) => 1 - levenshtein(a, b) / Math.max(a.length, b.length, 1);
 const uncappedOf = (f: Field<unknown>) => f.baseConfidence * (f.ocrConfidence ?? 1);
 
@@ -69,7 +69,7 @@ export function mergePasses(passes: BIData[]): BIData {
     const chosen = best.members.reduce((a, b) => (b.confidence > a.confidence ? b : a));
     const merged: Field<unknown> = { ...chosen, votes: best.members.length };
     if (best.members.length >= 2) {
-      // Concordância independente entre passagens reforça a confiança da leitura.
+      // Independent agreement across passes increases confidence in the reading.
       merged.confidence = Math.min(0.99, Math.max(...best.members.map(uncappedOf)) + 0.05 * (best.members.length - 1));
       merged.note = `${best.members.length}/${passes.length} passagens concordam`;
       if (!best.exact) { merged.confidence *= 0.9; merged.note += ' (com pequenas diferenças)'; }
@@ -146,7 +146,7 @@ export interface FinalizeArgs {
   now: Date;
   expected: BIFieldKey[];
   critical: BIFieldKey[];
-  /** Multiplica a confiança agregada (qualidade da imagem). */
+  /** Multiplies the aggregated confidence (image quality). */
   factor?: number;
   extraIssues?: Issue[];
 }
@@ -168,7 +168,7 @@ export function finalizeText(data: BIData, a: FinalizeArgs): { confidence: numbe
 
   const today = a.now.toISOString().slice(0, 10);
   const nasc = data.dataNascimento.value, emi = data.emitidoEm.value, val = data.validoAte.value;
-  // UTC respeita a duração de cada mês e os anos bissextos ao comparar aniversários.
+  // UTC respects month lengths and leap years when comparing birthdays.
   const addMonths = (iso: string, months: number): string => {
     const [year, month, day] = iso.split('-').map(Number);
     const targetMonth = month - 1 + months;
@@ -192,7 +192,7 @@ export function finalizeText(data: BIData, a: FinalizeArgs): { confidence: numbe
   if (emi && nasc && val && emi < val && expectedExpiry !== null && expectedExpiry !== val) {
     const years = validityYearsAtEmission(nasc, emi);
     add('validoAte', 'validity_span', `validade esperada ${expectedExpiry} (prazo de ${years} anos conforme a idade na emissão), lido ${val}`, 'warning');
-    for (const f of [data.emitidoEm, data.validoAte]) f.confidence *= 0.8; // Um dos dois valores foi provavelmente mal lido.
+    for (const f of [data.emitidoEm, data.validoAte]) f.confidence *= 0.8; // One of the two values was probably misread.
   }
   if (val && val < today) add('validoAte', 'expired', 'documento expirado', 'warning');
 

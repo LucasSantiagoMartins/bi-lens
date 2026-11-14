@@ -1,7 +1,7 @@
 /*
- * Responsabilidade: preparar imagens para análise e OCR.
- * Conteúdo: orientação EXIF, métricas, detecção de lados empilhados e recortes.
- * Pontos importantes: regras de classificação e campos ficam nos módulos do BI.
+ * Responsibility: prepare images for analysis and OCR.
+ * Contents: EXIF orientation, metrics, stacked-side detection, and crops.
+ * Key points: classification rules and fields belong in the BI modules.
  */
 export type ImageInput = Buffer | Uint8Array | string;
 

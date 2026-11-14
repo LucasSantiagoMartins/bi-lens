@@ -1,7 +1,7 @@
 /*
- * Responsabilidade: oferecer a API leve para quem já tem o texto OCR.
- * Conteúdo: parsing do BI, schema de validação e tipos do resultado.
- * Pontos importantes: não exporta nem inicializa processamento de imagem ou OCR.
+ * Responsibility: provide a lightweight API for callers who already have OCR text.
+ * Contents: BI parsing, validation schema, and result types.
+ * Key points: does not export or initialize image processing or OCR.
  */
 export { analyzeOcrPasses, parseBI } from './angola/bi/bi-document-analyzer';
 export type { BITextInput } from './angola/bi/bi-document-analyzer';

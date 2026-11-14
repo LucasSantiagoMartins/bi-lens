@@ -1,9 +1,9 @@
 /*
- * Responsabilidade: coordenar a análise de imagem e de texto OCR.
- * Conteúdo: configuração, processamento das imagens, passagens OCR, combinação
- * dos resultados e gestão do ciclo de vida do motor reutilizável.
- * Pontos importantes: a análise textual é partilhada pelos dois fluxos e o
- * motor criado internamente só é libertado por close() ou pelas funções one-shot.
+ * Responsibility: coordinate image analysis and OCR text analysis.
+ * Contents: configuration, image processing, OCR passes, result merging, and
+ * lifecycle management for the reusable engine.
+ * Key points: both flows share text analysis, and the internally created engine
+ * is released only by close() or the one-shot functions.
  */
 import { cropImageRegion, detectHorizontalDocumentRegions, loadImage, preprocess, type ImageInput, type ImageRegion } from '../../core/image-processing/preprocess';
 import type { DocumentReferences, DocumentSource } from '../../core/image-processing/document-source';
@@ -30,7 +30,7 @@ export interface LensOptions extends TextOptions {
 }
 
 export const DEFAULT_PASSES: PassConfig[] = [
-  // escalas diferentes → erros diferentes → a votação consegue apanhá-los
+  // Different scales produce different errors, which voting can catch.
   { width: 1552, psm: '3' },
   { width: 1164, psm: '3' },
   { width: 970, psm: '3' },

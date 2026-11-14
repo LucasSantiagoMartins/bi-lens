@@ -1,7 +1,7 @@
 /*
- * Responsabilidade: validar em runtime opções e resultados da análise.
- * Conteúdo: schemas Zod para campos, issues, metadados e configuração.
- * Pontos importantes: limites das opções devem coincidir com os tipos públicos.
+ * Responsibility: validate analysis options and results at runtime.
+ * Contents: Zod schemas for fields, issues, metadata, and configuration.
+ * Key points: option limits must match the public types.
  */
 import { z } from 'zod';
 

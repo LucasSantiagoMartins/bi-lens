@@ -1,7 +1,7 @@
 /*
- * Responsabilidade: avaliar geometria e qualidade básica da imagem.
- * Conteúdo: proporção do cartão, resolução mínima e heurística de nitidez.
- * Pontos importantes: produz avisos e ajusta confiança; não rejeita por si só.
+ * Responsibility: assess image geometry and basic quality.
+ * Contents: card aspect ratio, minimum resolution, and sharpness heuristic.
+ * Key points: produces warnings and adjusts confidence; does not reject on its own.
  */
 import type { ImageInfo } from '../../core/image-processing/preprocess';
 import { CARD_RATIO } from './bi-layout';

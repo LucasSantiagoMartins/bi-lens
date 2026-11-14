@@ -1,7 +1,7 @@
 /*
- * Responsabilidade: classificar a estrutura reconhecida no texto OCR.
- * Conteúdo: correspondência de marcadores, lados presentes e sinais de BI.
- * Pontos importantes: rejeita marcadores conhecidos de documentos de teste.
+ * Responsibility: classify the structure recognized in OCR text.
+ * Contents: marker matching, present sides, and BI signals.
+ * Key points: rejects known markers from test documents.
  */
 import { fuzzyContains } from '../../core/classification/fuzzy';
 import { matchText } from '../../core/text/normalize';

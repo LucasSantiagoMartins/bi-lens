@@ -1,7 +1,7 @@
 /*
- * Responsabilidade: ponto de entrada principal do pacote.
- * Conteúdo: análise de imagem e texto, fontes externas, tipos e extensão OCR.
- * Pontos importantes: mantém os exports públicos disponíveis pelo caminho ".".
+ * Responsibility: main package entry point.
+ * Contents: image and text analysis, external sources, types, and OCR extension.
+ * Key points: keeps the public exports available through the "." path.
  */
 export * from './text';
 export { createBILens, analyzeBI, analyzeBIFrom, parseBI, DEFAULT_PASSES } from './angola/bi/bi-document-analyzer';
