@@ -1,8 +1,9 @@
-# BI Lens
+# BI Lens 🇦🇴
 
 **Biblioteca TypeScript para analisar imagens de Bilhetes de Identidade angolanos e extrair dados estruturados com sinais de confiança e revisão.**
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue?logo=typescript)](https://www.typescriptlang.org/)
+[![npm version](https://img.shields.io/npm/v/bi-lens)](https://www.npmjs.com/package/bi-lens)
 [![Licença: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
 ## Visão geral
@@ -55,7 +56,7 @@ const lens = createBILens({ minConfidence: 0.85 });
 try {
   const result = await lens.analyze("./documento.jpg");
   console.log(result.status, result.confidence, result.values);
-  if (result.status !== "approved") encaminharParaRevisao(result);
+  if (result.status !== "approved") forwardForReview(result);
 } finally {
   await lens.close();
 }
