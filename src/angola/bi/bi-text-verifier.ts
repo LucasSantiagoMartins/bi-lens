@@ -3,23 +3,37 @@
  * Contents: OCR confidence, voting, age-based validity, checks, and final decision.
  * Key points: keeps business rules here, separate from extraction.
  */
-import { levenshtein, matchText } from '../../core/text/normalize';
-import type { OcrWord } from '../../core/ocr/types';
-import { ALL_FIELDS, VALIDITY_YEARS } from './bi-layout';
-import type { BIData, BIFieldKey, Field, Issue, Spans, Status } from './types';
+import { levenshtein, matchText } from "../../core/text/normalize";
+import type { OcrWord } from "../../core/ocr/types";
+import { ALL_FIELDS, VALIDITY_YEARS } from "./bi-layout";
+import type { BIData, BIFieldKey, Field, Issue, Spans, Status } from "./types";
 
 const CAP_CORRECTED = 0.75;
-const capped = (f: Field<unknown>) => (f.corrected ? Math.min(f.baseConfidence, CAP_CORRECTED) : f.baseConfidence);
+const capped = (f: Field<unknown>) =>
+  f.corrected ? Math.min(f.baseConfidence, CAP_CORRECTED) : f.baseConfidence;
 const keys = (d: BIData) => Object.keys(d) as BIFieldKey[];
 const mean = (a: number[]) => a.reduce((x, y) => x + y, 0) / a.length;
 
-const STRICT = new Set<BIFieldKey>(['numero', 'dataNascimento', 'emitidoEm', 'validoAte', 'altura']);
+const STRICT = new Set<BIFieldKey>([
+  "numero",
+  "dataNascimento",
+  "emitidoEm",
+  "validoAte",
+  "altura",
+]);
 
-export function applyWordConfidence(data: BIData, spans: Spans, words: OcrWord[]) {
+export function applyWordConfidence(
+  data: BIData,
+  spans: Spans,
+  words: OcrWord[],
+) {
   for (const key of keys(data)) {
-    const f = data[key] as Field<unknown>, sp = spans[key];
+    const f = data[key] as Field<unknown>,
+      sp = spans[key];
     if (f.raw === null || !sp) continue;
-    let ws = words.filter((w) => w.start < sp.end && w.end > sp.start && w.text.trim());
+    let ws = words.filter(
+      (w) => w.start < sp.end && w.end > sp.start && w.text.trim(),
+    );
     if (STRICT.has(key)) ws = ws.filter((w) => /[0-9(\[|!\/]/.test(w.text)); // Keeps characters useful for dates and numbers.
     if (!ws.length) continue;
     const c = ws.map((w) => Math.max(0, Math.min(1, w.confidence / 100)));
@@ -38,107 +52,182 @@ export function applyScalarConfidence(data: BIData, ocr: number) {
   }
 }
 
-
-const FUZZY = new Set<BIFieldKey>(['nome', 'filiacao', 'naturalDe', 'residencia']); // Free text tolerates small differences between passes.
-const similarity = (a: string, b: string) => 1 - levenshtein(a, b) / Math.max(a.length, b.length, 1);
-const uncappedOf = (f: Field<unknown>) => f.baseConfidence * (f.ocrConfidence ?? 1);
+const FUZZY = new Set<BIFieldKey>([
+  "nome",
+  "filiacao",
+  "naturalDe",
+  "residencia",
+]); // Free text tolerates small differences between passes.
+const similarity = (a: string, b: string) =>
+  1 - levenshtein(a, b) / Math.max(a.length, b.length, 1);
+const uncappedOf = (f: Field<unknown>) =>
+  f.baseConfidence * (f.ocrConfidence ?? 1);
 
 export function mergePasses(passes: BIData[]): BIData {
   if (passes.length === 1) return passes[0];
   const out = {} as Record<string, unknown>;
   for (const key of keys(passes[0])) {
-    const cands = passes.map((p) => p[key] as Field<unknown>).filter((f) => f.raw !== null);
-    if (!cands.length) { out[key] = passes[0][key]; continue; }
-    const valid = cands.filter((f) => f.valid && f.value !== null);
-    if (!valid.length) {
-      out[key] = { ...cands.reduce((a, b) => (b.confidence > a.confidence ? b : a)), votes: 0 };
+    const cands = passes
+      .map((p) => p[key] as Field<unknown>)
+      .filter((f) => f.raw !== null);
+    if (!cands.length) {
+      out[key] = passes[0][key];
       continue;
     }
-    const groups: { key: string; members: Field<unknown>[]; exact: boolean }[] = [];
+    const valid = cands.filter((f) => f.valid && f.value !== null);
+    if (!valid.length) {
+      out[key] = {
+        ...cands.reduce((a, b) => (b.confidence > a.confidence ? b : a)),
+        votes: 0,
+      };
+      continue;
+    }
+    const groups: { key: string; members: Field<unknown>[]; exact: boolean }[] =
+      [];
     for (const f of valid) {
       const k = matchText(JSON.stringify(f.value));
-      const g = groups.find((x) => x.key === k || (FUZZY.has(key) && similarity(x.key, k) >= 0.85));
+      const g = groups.find(
+        (x) => x.key === k || (FUZZY.has(key) && similarity(x.key, k) >= 0.85),
+      );
       if (!g) groups.push({ key: k, members: [f], exact: true });
-      else { g.members.push(f); if (g.key !== k) g.exact = false; }
+      else {
+        g.members.push(f);
+        if (g.key !== k) g.exact = false;
+      }
     }
     groups.sort(
-      (a, b) => b.members.length - a.members.length ||
-        Math.max(...b.members.map((f) => f.confidence)) - Math.max(...a.members.map((f) => f.confidence))
+      (a, b) =>
+        b.members.length - a.members.length ||
+        Math.max(...b.members.map((f) => f.confidence)) -
+          Math.max(...a.members.map((f) => f.confidence)),
     );
     const best = groups[0];
-    const chosen = best.members.reduce((a, b) => (b.confidence > a.confidence ? b : a));
+    const chosen = best.members.reduce((a, b) =>
+      b.confidence > a.confidence ? b : a,
+    );
     const merged: Field<unknown> = { ...chosen, votes: best.members.length };
     if (best.members.length >= 2) {
       // Independent agreement across passes increases confidence in the reading.
-      merged.confidence = Math.min(0.99, Math.max(...best.members.map(uncappedOf)) + 0.05 * (best.members.length - 1));
+      merged.confidence = Math.min(
+        0.99,
+        Math.max(...best.members.map(uncappedOf)) +
+          0.05 * (best.members.length - 1),
+      );
       merged.note = `${best.members.length}/${passes.length} passagens concordam`;
-      if (!best.exact) { merged.confidence *= 0.9; merged.note += ' (com pequenas diferenças)'; }
+      if (!best.exact) {
+        merged.confidence *= 0.9;
+        merged.note += " (com pequenas diferenças)";
+      }
     }
     if (groups.length > 1) {
       merged.confidence *= 0.75;
-      merged.note = 'passagens divergentes';
+      merged.note = "passagens divergentes";
     }
     out[key] = merged;
   }
   return out as unknown as BIData;
 }
 
-
-function validityYearsAtEmission(nascimentoIso: string, emitidoIso: string): number | null {
-  const [birthYear, birthMonth, birthDay] = nascimentoIso.split('-').map(Number);
-  const [issueYear, issueMonth, issueDay] = emitidoIso.split('-').map(Number);
+function validityYearsAtEmission(
+  nascimentoIso: string,
+  emitidoIso: string,
+): number | null {
+  const [birthYear, birthMonth, birthDay] = nascimentoIso
+    .split("-")
+    .map(Number);
+  const [issueYear, issueMonth, issueDay] = emitidoIso.split("-").map(Number);
   let age = issueYear - birthYear;
-  if (issueMonth < birthMonth || (issueMonth === birthMonth && issueDay < birthDay)) age--;
+  if (
+    issueMonth < birthMonth ||
+    (issueMonth === birthMonth && issueDay < birthDay)
+  )
+    age--;
   if (age <= 20) return VALIDITY_YEARS.minor;
   if (age <= 55) return VALIDITY_YEARS.adult;
   return null;
 }
 
-export function expectedValidity(emitidoIso: string, nascimentoIso: string): string | null {
+export function expectedValidity(
+  emitidoIso: string,
+  nascimentoIso: string,
+): string | null {
   const years = validityYearsAtEmission(nascimentoIso, emitidoIso);
   if (years === null) return null;
-  const [y, m, d] = emitidoIso.split('-').map(Number);
+  const [y, m, d] = emitidoIso.split("-").map(Number);
   const dt = new Date(Date.UTC(y + years, m - 1, d));
   dt.setUTCDate(dt.getUTCDate() - 1);
   return dt.toISOString().slice(0, 10);
 }
 
 const ruled = (f: Field<unknown>, corroborated: boolean) =>
-  Math.min(0.97, f.baseConfidence * (corroborated ? Math.max(f.ocrConfidence ?? 1, 0.9) : f.ocrConfidence ?? 1));
+  Math.min(
+    0.97,
+    f.baseConfidence *
+      (corroborated
+        ? Math.max(f.ocrConfidence ?? 1, 0.9)
+        : (f.ocrConfidence ?? 1)),
+  );
 
 export function resolveValidity(merged: BIData, passes: BIData[]) {
-  const pool = (k: 'emitidoEm' | 'validoAte') =>
+  const pool = (k: "emitidoEm" | "validoAte") =>
     passes.map((p) => p[k]).filter((f) => f.valid && f.value);
-  const E = pool('emitidoEm'), V = pool('validoAte');
+  const E = pool("emitidoEm"),
+    V = pool("validoAte");
   const cur = { e: merged.emitidoEm.value, v: merged.validoAte.value };
   const nascimento = merged.dataNascimento.value;
   if (!nascimento) return;
   const noteFor = (emitido: string) => {
     const years = validityYearsAtEmission(nascimento, emitido);
-    return years === null ? null : `confirmado pela regra de validade (${years} anos − 1 dia)`;
+    return years === null
+      ? null
+      : `confirmado pela regra de validade (${years} anos − 1 dia)`;
   };
 
   if (cur.e && cur.v && expectedValidity(cur.e, nascimento) === cur.v) {
-    const note = noteFor(cur.e) ?? 'confirmado pela validade vitalícia';
-    const corroborated = merged.emitidoEm.votes >= 2 || merged.validoAte.votes >= 2;
-    for (const f of [merged.emitidoEm, merged.validoAte]) { f.confidence = Math.max(f.confidence, ruled(f, corroborated)); f.note = note; }
+    const note = noteFor(cur.e) ?? "confirmado pela validade vitalícia";
+    const corroborated =
+      merged.emitidoEm.votes >= 2 || merged.validoAte.votes >= 2;
+    for (const f of [merged.emitidoEm, merged.validoAte]) {
+      f.confidence = Math.max(f.confidence, ruled(f, corroborated));
+      f.note = note;
+    }
     return;
   }
   const pairs: [Field<string>, Field<string>][] = [];
-  for (const e of E) for (const v of V) {
-    const expected = e.value ? expectedValidity(e.value, nascimento) : null;
-    if (expected !== null && expected === v.value) pairs.push([e, v]);
-  }
+  for (const e of E)
+    for (const v of V) {
+      const expected = e.value ? expectedValidity(e.value, nascimento) : null;
+      if (expected !== null && expected === v.value) pairs.push([e, v]);
+    }
   if (!pairs.length) return;
   const score = ([e, v]: [Field<string>, Field<string>]) =>
-    (e.value === cur.e ? 1 : 0) + (v.value === cur.v ? 1 : 0) + e.confidence + v.confidence;
+    (e.value === cur.e ? 1 : 0) +
+    (v.value === cur.v ? 1 : 0) +
+    e.confidence +
+    v.confidence;
   const [e, v] = pairs.sort((a, b) => score(b) - score(a))[0];
-  const note = e.value ? noteFor(e.value) ?? 'confirmado pela regra de validade' : 'confirmado pela regra de validade';
-  const corroborated = [e, v].some((f) => passes.filter((p) => p[f === e ? 'emitidoEm' : 'validoAte'].value === f.value).length >= 2);
-  merged.emitidoEm = { ...e, confidence: ruled(e, corroborated), votes: Math.max(e.votes, 1), note: `resolvido: ${note}` };
-  merged.validoAte = { ...v, confidence: ruled(v, corroborated), votes: Math.max(v.votes, 1), note: `resolvido: ${note}` };
+  const note = e.value
+    ? (noteFor(e.value) ?? "confirmado pela regra de validade")
+    : "confirmado pela regra de validade";
+  const corroborated = [e, v].some(
+    (f) =>
+      passes.filter(
+        (p) => p[f === e ? "emitidoEm" : "validoAte"].value === f.value,
+      ).length >= 2,
+  );
+  merged.emitidoEm = {
+    ...e,
+    confidence: ruled(e, corroborated),
+    votes: Math.max(e.votes, 1),
+    note: `resolvido: ${note}`,
+  };
+  merged.validoAte = {
+    ...v,
+    confidence: ruled(v, corroborated),
+    votes: Math.max(v.votes, 1),
+    note: `resolvido: ${note}`,
+  };
 }
-
 
 export interface FinalizeArgs {
   minConfidence: number;
@@ -151,74 +240,164 @@ export interface FinalizeArgs {
   extraIssues?: Issue[];
 }
 
-export function finalizeText(data: BIData, a: FinalizeArgs): { confidence: number; status: Status; reasons: string[]; issues: Issue[] } {
+export function finalizeText(
+  data: BIData,
+  a: FinalizeArgs,
+): { confidence: number; status: Status; reasons: string[]; issues: Issue[] } {
   const issues: Issue[] = [...(a.extraIssues ?? [])];
-  const add = (field: string, code: string, message: string, severity: Issue['severity']) =>
-    issues.push({ field, code, message, severity });
+  const add = (
+    field: string,
+    code: string,
+    message: string,
+    severity: Issue["severity"],
+  ) => issues.push({ field, code, message, severity });
 
   for (const k of a.expected) {
     const f = data[k] as Field<unknown>;
     const isCrit = a.critical.includes(k);
-    if (f.raw === null) add(k, 'missing', 'campo não encontrado', isCrit ? 'error' : 'warning');
-    else if (!f.valid) add(k, 'invalid', 'valor não passou na validação', isCrit ? 'error' : 'warning');
+    if (f.raw === null)
+      add(k, "missing", "campo não encontrado", isCrit ? "error" : "warning");
+    else if (!f.valid)
+      add(
+        k,
+        "invalid",
+        "valor não passou na validação",
+        isCrit ? "error" : "warning",
+      );
     if (f.raw !== null && f.valid && !isCrit && f.confidence < a.minConfidence)
-      add(k, 'low_confidence', `confiança baixa (${f.confidence.toFixed(2)}); confirme manualmente`, 'warning');
-    if (f.note === 'passagens divergentes') add(k, 'ocr_disagreement', 'as passagens de OCR leram valores diferentes', 'warning');
+      add(
+        k,
+        "low_confidence",
+        `confiança baixa (${f.confidence.toFixed(2)}); confirme manualmente`,
+        "warning",
+      );
+    if (f.note === "passagens divergentes")
+      add(
+        k,
+        "ocr_disagreement",
+        "as passagens de OCR leram valores diferentes",
+        "warning",
+      );
   }
 
   const today = a.now.toISOString().slice(0, 10);
-  const nasc = data.dataNascimento.value, emi = data.emitidoEm.value, val = data.validoAte.value;
+  const nasc = data.dataNascimento.value,
+    emi = data.emitidoEm.value,
+    val = data.validoAte.value;
   // UTC respects month lengths and leap years when comparing birthdays.
   const addMonths = (iso: string, months: number): string => {
-    const [year, month, day] = iso.split('-').map(Number);
+    const [year, month, day] = iso.split("-").map(Number);
     const targetMonth = month - 1 + months;
     const targetYear = year + Math.floor(targetMonth / 12);
     const normalizedMonth = ((targetMonth % 12) + 12) % 12;
-    const lastDay = new Date(Date.UTC(targetYear, normalizedMonth + 1, 0)).getUTCDate();
-    return new Date(Date.UTC(targetYear, normalizedMonth, Math.min(day, lastDay))).toISOString().slice(0, 10);
+    const lastDay = new Date(
+      Date.UTC(targetYear, normalizedMonth + 1, 0),
+    ).getUTCDate();
+    return new Date(
+      Date.UTC(targetYear, normalizedMonth, Math.min(day, lastDay)),
+    )
+      .toISOString()
+      .slice(0, 10);
   };
-  const expiryAge = val && val < today
-    ? (today > addMonths(val, 12) ? 'over_year' : today > addMonths(val, 6) ? 'over_six_months' : 'under_six_months')
-    : null;
-  const expiryReason = expiryAge === 'over_year'
-    ? 'Bilhete de Identidade caducado há mais de 1 ano.'
-    : expiryAge === 'over_six_months' ? 'Bilhete de Identidade caducado há mais de 6 meses.' : null;
-  if (nasc && nasc > today) add('dataNascimento', 'future', 'data de nascimento no futuro', 'error');
-  if (emi && emi > today) add('emitidoEm', 'future', 'data de emissão no futuro', 'error');
-  if (nasc && a.now.getUTCFullYear() - Number(nasc.slice(0, 4)) > 120) add('dataNascimento', 'age', 'idade superior a 120 anos', 'warning');
-  if (nasc && emi && nasc >= emi) add('emitidoEm', 'date_order', 'emissão anterior ou igual ao nascimento', 'error');
-  if (emi && val && emi >= val) add('validoAte', 'date_order', 'validade anterior ou igual à emissão', 'error');
+  const expiryAge =
+    val && val < today
+      ? today > addMonths(val, 12)
+        ? "over_year"
+        : today > addMonths(val, 6)
+          ? "over_six_months"
+          : "under_six_months"
+      : null;
+  const expiryReason =
+    expiryAge === "over_year"
+      ? "Bilhete de Identidade caducado há mais de 1 ano."
+      : expiryAge === "over_six_months"
+        ? "Bilhete de Identidade caducado há mais de 6 meses."
+        : null;
+  if (nasc && nasc > today)
+    add("dataNascimento", "future", "data de nascimento no futuro", "error");
+  if (emi && emi > today)
+    add("emitidoEm", "future", "data de emissão no futuro", "error");
+  if (nasc && a.now.getUTCFullYear() - Number(nasc.slice(0, 4)) > 120)
+    add("dataNascimento", "age", "idade superior a 120 anos", "warning");
+  if (nasc && emi && nasc >= emi)
+    add(
+      "emitidoEm",
+      "date_order",
+      "emissão anterior ou igual ao nascimento",
+      "error",
+    );
+  if (emi && val && emi >= val)
+    add(
+      "validoAte",
+      "date_order",
+      "validade anterior ou igual à emissão",
+      "error",
+    );
   const expectedExpiry = emi && nasc ? expectedValidity(emi, nasc) : null;
-  if (emi && nasc && val && emi < val && expectedExpiry !== null && expectedExpiry !== val) {
+  if (
+    emi &&
+    nasc &&
+    val &&
+    emi < val &&
+    expectedExpiry !== null &&
+    expectedExpiry !== val
+  ) {
     const years = validityYearsAtEmission(nasc, emi);
-    add('validoAte', 'validity_span', `validade esperada ${expectedExpiry} (prazo de ${years} anos conforme a idade na emissão), lido ${val}`, 'warning');
+    add(
+      "validoAte",
+      "validity_span",
+      `validade esperada ${expectedExpiry} (prazo de ${years} anos conforme a idade na emissão), lido ${val}`,
+      "warning",
+    );
     for (const f of [data.emitidoEm, data.validoAte]) f.confidence *= 0.8; // One of the two values was probably misread.
   }
-  if (val && val < today) add('validoAte', 'expired', 'documento expirado', 'warning');
+  if (val && val < today)
+    add("validoAte", "expired", "documento expirado", "warning");
 
   const all = a.expected.map((k) => (data[k] as Field<unknown>).confidence);
-  const minCrit = Math.min(...a.critical.map((k) => (data[k] as Field<unknown>).confidence));
-  const confidence = Number(((0.6 * minCrit + 0.4 * mean(all)) * (a.factor ?? 1)).toFixed(4));
+  const minCrit = Math.min(
+    ...a.critical.map((k) => (data[k] as Field<unknown>).confidence),
+  );
+  const confidence = Number(
+    ((0.6 * minCrit + 0.4 * mean(all)) * (a.factor ?? 1)).toFixed(4),
+  );
 
   const reasons: string[] = [];
   if (confidence < a.rejectBelow) {
     if (expiryReason) reasons.push(expiryReason);
-    reasons.push(`confiança agregada (${confidence.toFixed(2)}) abaixo de ${a.rejectBelow}`);
-    return { confidence, status: 'rejected', reasons: [...new Set(reasons)], issues };
+    reasons.push(
+      `confiança agregada (${confidence.toFixed(2)}) abaixo de ${a.rejectBelow}`,
+    );
+    return {
+      confidence,
+      status: "rejected",
+      reasons: [...new Set(reasons)],
+      issues,
+    };
   }
 
   for (const k of a.critical) {
     const f = data[k] as Field<unknown>;
     if (f.raw === null) reasons.push(`${k}: não encontrado`);
     else if (!f.valid) reasons.push(`${k}: inválido`);
-    else if (f.confidence < a.minConfidence) reasons.push(`${k}: confiança baixa (${f.confidence.toFixed(2)})`);
+    else if (f.confidence < a.minConfidence)
+      reasons.push(`${k}: confiança baixa (${f.confidence.toFixed(2)})`);
   }
-  for (const i of issues) if (i.severity === 'error' && i.code !== 'missing' && i.code !== 'invalid') reasons.push(`${i.field}: ${i.message}`);
-  if (confidence < a.minConfidence) reasons.push(`confiança agregada (${confidence.toFixed(2)}) abaixo de ${a.minConfidence}`);
+  for (const i of issues)
+    if (i.severity === "error" && i.code !== "missing" && i.code !== "invalid")
+      reasons.push(`${i.field}: ${i.message}`);
+  if (confidence < a.minConfidence)
+    reasons.push(
+      `confiança agregada (${confidence.toFixed(2)}) abaixo de ${a.minConfidence}`,
+    );
   if (expiryReason) reasons.push(expiryReason);
 
-  const status: Status = expiryAge === 'over_year' ? 'rejected'
-    : (reasons.length || expiryAge === 'over_six_months') ? 'needs_review' : 'approved';
+  const status: Status =
+    expiryAge === "over_year"
+      ? "rejected"
+      : reasons.length || expiryAge === "over_six_months"
+        ? "needs_review"
+        : "approved";
   return { confidence, status, reasons: [...new Set(reasons)], issues };
 }
 
